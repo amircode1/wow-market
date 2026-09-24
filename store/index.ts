@@ -265,6 +265,7 @@ export const useChartStore = create<ChartState>()(
 // Region Store
 interface RegionState {
   selectedRegion: BlizzardRegion;
+  isHydrated: boolean;
   setRegion: (region: BlizzardRegion) => void;
 }
 
@@ -273,11 +274,15 @@ export const useRegionStore = create<RegionState>()(
     persist(
       (set) => ({
         selectedRegion: 'us',
+        isHydrated: false,
         setRegion: (region) => set({ selectedRegion: region }),
       }),
       {
         name: 'wow-market-region',
         partialize: (state) => ({ selectedRegion: state.selectedRegion }),
+        onRehydrateStorage: () => () => {
+          useRegionStore.setState({ isHydrated: true });
+        },
       }
     ),
     { name: 'region-store' }
