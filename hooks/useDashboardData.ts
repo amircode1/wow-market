@@ -80,6 +80,12 @@ export function useDashboardData(): DashboardData {
     queries: itemCandidates.map((item) => ({
       queryKey: ['dashboard-item', selectedRegion, item.id],
       queryFn: async () => {
+        try {
+          const cached = await CacheManager.getCachedItem(item.id);
+          if (cached) return cached;
+        } catch {
+          // Continue with the network request if local cache is unavailable.
+        }
         const response = await fetch(`/api/blizzard/items/${item.id}?region=${selectedRegion}`);
         if (!response.ok) throw new Error('Failed to fetch item details');
         return response.json() as Promise<Item>;
@@ -113,7 +119,7 @@ export function useDashboardData(): DashboardData {
     topGainers,
     topLosers,
     trending: hasRealm ? trending : [],
-    isLoading: hasRealm && (auctionsQuery.isLoading || moversQuery.isLoading || itemQueries.some((query) => query.isLoading)),
+    isLoading: hasRealm && (auctionsQuery.isLoading || moversQuery.isLoading),
     error: hasRealm ? ((auctionsQuery.error as Error | null)?.message ?? null) : null,
   };
 }

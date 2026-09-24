@@ -99,7 +99,7 @@ export const queryKeys = {
 
 // Realms
 export function useRealms() {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.realms, selectedRegion],
     queryFn: async () => {
@@ -107,14 +107,13 @@ export function useRealms() {
       if (!response.ok) throw new Error('Failed to fetch realms');
       return response.json() as Promise<ConnectedRealm[]>;
     },
-    enabled: isHydrated,
     staleTime: 7 * 24 * 60 * 60 * 1000, // 7 days
     refetchOnWindowFocus: false,
   });
 }
 
 export function useRealmDetails(realmId: number) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.realmDetails(realmId), selectedRegion],
     queryFn: async () => {
@@ -122,14 +121,14 @@ export function useRealmDetails(realmId: number) {
       if (!response.ok) throw new Error('Failed to fetch realm details');
       return response.json() as Promise<ConnectedRealm>;
     },
-    enabled: isHydrated && !!realmId,
+    enabled: !!realmId,
     staleTime: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 }
 
 // Auctions
 export function useAuctionData(realmId: number) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.auctions(realmId), selectedRegion],
     queryFn: async () => {
@@ -137,15 +136,15 @@ export function useAuctionData(realmId: number) {
       if (!response.ok) throw new Error('Failed to fetch auctions');
       return response.json() as Promise<AuctionHouse>;
     },
-    enabled: isHydrated && !!realmId,
+    enabled: !!realmId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Auto-refetch every 5 minutes
     refetchOnWindowFocus: true,
   });
 }
 
-export function useCommoditiesData() {
-  const { selectedRegion, isHydrated } = useRegionStore();
+export function useCommoditiesData(enabled = true) {
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.commodities, selectedRegion],
     queryFn: async () => {
@@ -155,13 +154,13 @@ export function useCommoditiesData() {
     },
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
-    enabled: isHydrated,
     refetchOnWindowFocus: true,
+    enabled,
   });
 }
 
 export function useWowTokenPrice() {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: ['wow-token', selectedRegion],
     queryFn: async () => {
@@ -171,46 +170,57 @@ export function useWowTokenPrice() {
     },
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
-    enabled: isHydrated,
     refetchOnWindowFocus: true,
   });
 }
 
 // Items
 export function useItemDetails(itemId: number) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.itemDetails(itemId), selectedRegion],
     queryFn: async () => {
+      try {
+        const cached = await CacheManager.getCachedItem(itemId);
+        if (cached) return cached;
+      } catch {
+        // Continue with the network request if local cache is unavailable.
+      }
       const response = await fetch(`/api/blizzard/items/${itemId}?region=${selectedRegion}`);
       if (!response.ok) throw new Error('Failed to fetch item details');
       const item = await response.json() as Item;
       await CacheManager.cacheItem(item).catch(() => undefined);
       return item;
     },
-    enabled: isHydrated && !!itemId,
+    enabled: !!itemId,
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
   });
 }
 
 export function useItemMedia(itemId: number) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.itemMedia(itemId), selectedRegion],
     queryFn: async () => {
+      try {
+        const cached = await CacheManager.getCachedItemMedia(itemId);
+        if (cached) return cached;
+      } catch {
+        // Continue with the network request if local cache is unavailable.
+      }
       const response = await fetch(`/api/blizzard/items/${itemId}/media?region=${selectedRegion}`);
       if (!response.ok) throw new Error('Failed to fetch item media');
       const media = await response.json() as ItemMedia;
       await CacheManager.cacheItemMedia(itemId, media).catch(() => undefined);
       return media;
     },
-    enabled: isHydrated && !!itemId,
+    enabled: !!itemId,
     staleTime: 30 * 24 * 60 * 60 * 1000, // 30 days
   });
 }
 
 export function useItemSearch(query: string, page: number = 1) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.itemSearch(query, page), selectedRegion],
     queryFn: async () => {
@@ -218,13 +228,13 @@ export function useItemSearch(query: string, page: number = 1) {
       if (!response.ok) throw new Error('Failed to search items');
       return response.json() as Promise<SearchResponse<ItemSearchResultItem>>;
     },
-    enabled: isHydrated && !!query && query.length >= 2,
+    enabled: !!query && query.length >= 2,
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 }
 
 export function useInfiniteItemSearch(query: string) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useInfiniteQuery({
     queryKey: [...queryKeys.itemSearch(query, 1), 'infinite', selectedRegion],
     queryFn: async ({ pageParam }) => {
@@ -235,14 +245,14 @@ export function useInfiniteItemSearch(query: string) {
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.pageCount ? lastPage.page + 1 : undefined,
-    enabled: isHydrated && !!query && query.length >= 2,
+    enabled: !!query && query.length >= 2,
     staleTime: 60 * 60 * 1000,
   });
 }
 
 // Recipes
 export function useRecipe(recipeId: number) {
-  const { selectedRegion, isHydrated } = useRegionStore();
+  const { selectedRegion } = useRegionStore();
   return useQuery({
     queryKey: [...queryKeys.recipe(recipeId), selectedRegion],
     queryFn: async () => {
@@ -251,7 +261,7 @@ export function useRecipe(recipeId: number) {
       if (!response.ok) throw new Error('Failed to fetch recipe');
       return response.json() as Promise<Recipe>;
     },
-    enabled: isHydrated && !!recipeId,
+    enabled: !!recipeId,
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
   });
 }
@@ -288,7 +298,7 @@ export function useItemPrices(itemId: number) {
     data: commodities,
     isLoading: commoditiesLoading,
     error: commoditiesError,
-  } = useCommoditiesData();
+  } = useCommoditiesData(Boolean(selectedRealmId));
 
   // Derive prices directly from the latest auction query data. A nested
   // useQuery here used to keep a separate 5-minute cache, so a refreshed
